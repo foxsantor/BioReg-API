@@ -2,12 +2,17 @@ const express = require('express')
 const session = require('express-session')
 const flash = require('connect-flash')
 const passport = require('passport')
-
+var cors= require('cors');
 
 const app = express()
 //Passport Config
 require('./config/passport')(passport)
 const mongoose = require('mongoose')
+
+app.use(cors({
+  origin:['http://localhost:4200','http://127.0.0.1:4200','http://192.168.1.3:5000'],
+  credentials:true
+})) 
 
 //DB Config
 const db = require('./config/Keys').MongoURI
@@ -22,10 +27,17 @@ app.use(express.urlencoded({ extended: false}))
 app.use(express.json())
 
 //Express Session
+const MongoStore = require('connect-mongo')(session)
 app.use(session({
     secret: 'secret',
     resave: true,
     saveUninitialized: true,
+    cookie:{
+      maxAge:36000000,
+      httpOnly:false,
+      secure:false
+    }
+    ,store:new MongoStore({mongooseConnection:mongoose.connection})
   }))
 //Passport middleware
 app.use(passport.initialize())
