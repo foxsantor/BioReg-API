@@ -47,6 +47,7 @@ router.post('/login', function (req, res, next) {
     });
   })(req, res, next);
 });
+
 //users list
 router.get('/listUsers', function (req, res) {
   User.find({},function(err, users){
@@ -59,10 +60,12 @@ router.get('/listUsers', function (req, res) {
   })
   //return res.status(200).json();
 });
+
 //profile handle 
 router.get('/profile', isValidUser, function (req, res, next) {
   return res.status(200).json(req.user);
 });
+
 //logged user verification
 function isValidUser(req, res, next) {
   if (req.isAuthenticated()) next();

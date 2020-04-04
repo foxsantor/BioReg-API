@@ -10,7 +10,7 @@ require('./config/passport')(passport)
 const mongoose = require('mongoose')
 
 app.use(cors({
-  origin:['http://localhost:4200','http://127.0.0.1:4200','http://192.168.1.2:5000'],
+  origin:['http://localhost:4200','http://127.0.0.1:4200','http://192.168.1.7:5000'],
   credentials:true
 })) 
 
@@ -56,6 +56,7 @@ app.use((req,res,next)=>{
 //Routes
 app.use('/',require('./routes/index'))
 app.use('/users',require('./routes/users'))
+app.use('/admins',require('./routes/admins'))
 
 
 

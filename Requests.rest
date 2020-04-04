@@ -17,3 +17,15 @@ Content-Type: application/json
  "email" : "bioreginc@gmail.com",
  "password" : "bioreg2020$"
 }
+
+###
+POST  http://localhost:5000/admins/register
+Content-Type: application/json
+
+{
+ "firstName": "BioRegs",
+ "lastName": "BioRegs",
+ "email" : "bioregisc@gmail.com",
+ "password" : "bioreg2020$",
+ "passwordCheck" : "bioreg2020$"
+}
