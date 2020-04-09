@@ -1,5 +1,5 @@
 const express = require('express')
-const User = require('../Models/User')
+//const User = require('../Models/User')
 const Admin = require('../Models/Admin')
 const bcrypt = require('bcryptjs')
 const passport = require('passport')
@@ -41,7 +41,7 @@ router.get('/listAdmins', function (req, res) {
             res.send('somthing went wrong');
             next();
         }
-        res.json(admins);
+        res.json(admins.s);
     })
     //return res.status(200).json();
 });
@@ -193,11 +193,12 @@ router.post('/reset/:token', function (req, res) {
 // Register Handle
 router.post('/register', (req, res) => {
     
-    const { firstName, lastName, email, password, passwordCheck } = req.body
+    const { firstName, lastName, email, password, passwordCheck, gender, position, qualification, phoneNumber } = req.body
     //console.log(passwordCheck)
     let errors = []
+    console.log(req.body);
     //Cheeck require fields
-    if (!firstName | !lastName | !email | !password | !passwordCheck) {
+    if (!firstName | !lastName | !email | !password | !passwordCheck | !position | !qualification | !phoneNumber | !gender) {
         errors.push({ message: "please fill in all fields" })
     }
     //Check password Match
@@ -221,7 +222,7 @@ router.post('/register', (req, res) => {
                 errors.forEach(element => { console.log(element.message) })
                 res.send("something went wrong")
             } else {
-                const newAdmin = new Admin({ firstName, lastName, email, password })
+                const newAdmin = new Admin({ firstName, lastName, email, password, gender, position, qualification, phoneNumber})
                 //console.log(newUser)
                 bcrypt.genSalt(10, (err, salt) => bcrypt.hash(newAdmin.password, salt, (err, hash) => {
                     if (err) throw err
@@ -247,7 +248,7 @@ router.post('/register', (req, res) => {
 //update profile
 router.put('/updateProfile', (req, res) => {
 
-    const { firstName, lastName, email, password, passwordCheck } = req.body
+    const { firstName, lastName, email, password, passwordCheck, phoneNumber } = req.body
     let errors = []
     if (errors.length > 0) {
         //render register page again and refill the form
@@ -255,13 +256,16 @@ router.put('/updateProfile', (req, res) => {
 
     } else {
         //Validation pass
-        User.findOne({ email: email }).then(user => {
+        Admin.findOne({ email: email }).then(admin => {
             //console.log(user)
             if (firstName) {
-                user.firstName = firstName
+                admin.firstName = firstName
             }
             if (lastName) {
-                user.lastName = lastName
+                admin.lastName = lastName
+            }
+            if (phoneNumber) {
+                admin.phoneNumber = phoneNumber
             }
             if (password) {
                 if (password !== passwordCheck) {
@@ -276,14 +280,14 @@ router.put('/updateProfile', (req, res) => {
                         bcrypt.genSalt(10, (err, salt) => bcrypt.hash(password, salt, (err, hash) => {
                             if (err) throw err
                             //Set password to hashed
-                            user.password = hash;
-                            user.save();
+                            admin.password = hash;
+                            admin.save();
                         }))
                     }
                 }
             }
             else {
-                user.save();
+                admin.save();
             }
         })
     }
