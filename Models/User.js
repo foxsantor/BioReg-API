@@ -15,6 +15,33 @@ const UserSchema = new mongoose.Schema(
         type : String,
         require : true
     },
+    zipCode :{
+        type : String,
+        require : true
+    },
+    phone :{
+        type : String,
+        require : true
+    },
+    address :{
+        type : String,
+        require : true
+    },
+    ville :{
+        type : String,
+        require : true
+    },
+    state :{
+        type : String,
+        require : true
+    },
+    subscription :{
+        type : String,
+        require : true
+    },
+    subscriptionStartDate :{
+        type : Date,
+    },
     password :{
         type : String,
         require : true

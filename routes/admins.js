@@ -1,12 +1,13 @@
 const express = require('express')
-//const User = require('../Models/User')
 const Admin = require('../Models/Admin')
+const User = require('../Models/User')
 const bcrypt = require('bcryptjs')
 const passport = require('passport')
 const router = express.Router()
 const async = require('async')
 const nodemailer = require('nodemailer')
 const crypto = require('crypto')
+const LocalStrategy = require('passport-local').Strategy;
 
 //Login Page
 router.get('/login', (req, res) => res.send('Login'))
@@ -22,9 +23,42 @@ router.get('/logout', isValidAdmin, (req, res) => {
     res.redirect('http://localhost:4200/#/pages/login')
 })
 
+//admin strategy
+/*passport.use('admin', new LocalStrategy(
+    function(email, password, done) {
+      Admin.findOne({ email: email, password:password })
+    }
+  ));*/
+
+  passport.use('admin', new LocalStrategy({
+    usernameField: 'email',
+    passwordField: 'password',
+   
+  },
+  function(email, password, done) {
+    Admin.findOne({
+      email: email
+    }, function(err, admin) {
+      if (err) return done(err);
+
+      if (!admin) {
+        return done(null, false, {
+          message: 'This email is not registered.'
+        });
+      }
+      if (!admin.authenticate(password)) {
+        return done(null, false, {
+          message: 'This password is not correct.'
+        });
+      }
+      return done(null, admin);
+    });
+  }
+));
+
 //Login Handle
 router.post('/login', function (req, res, next) {
-    passport.authenticate('local', function (err, admin, info) {
+    passport.authenticate('admin', function (err, admin, info) {
         if (err) { return res.status(501).json(err); }
         if (!admin) { return res.status(501).json(info); }
         req.logIn(admin, function (err) {
@@ -35,20 +69,41 @@ router.post('/login', function (req, res, next) {
 });
 
 //users list
+router.get('/listUsers', function (req, res) {
+    User.find({}, function (err, users) {
+        if (err) {
+            res.send('somthing went wrong');
+            next();
+        }
+        res.json(users);
+    })
+    //return res.status(200).json();
+});
+
+//admins list
 router.get('/listAdmins', function (req, res) {
     Admin.find({}, function (err, admins) {
         if (err) {
             res.send('somthing went wrong');
             next();
         }
-        res.json(admins.s);
+        res.json(admins);
     })
     //return res.status(200).json();
 });
+
 //profile handle 
 router.get('/adminProfile', isValidAdmin, function (req, res, next) {
     return res.status(200).json(req.admin);
 });
+
+passport.serializeUser(function (user, done) {
+    done(null, users[0].id);
+});
+passport.deserializeUser(function (id, done) {
+    done(null, users[0]);
+});
+
 //logged user verification
 function isValidAdmin(req, res, next) {
     if (req.isAuthenticated()) next();
@@ -293,6 +348,26 @@ router.put('/updateProfile', (req, res) => {
     }
 })
 
+//update profile
+router.put('/updateState', (req, res) => {
+
+    const { email, state } = req.body
+    let errors = []
+    if (errors.length > 0) {
+        //render register page again and refill the form
+        errors.forEach(element => { console.log(element.message) })
+
+    } else {
+        //Validation pass
+        User.findOne({ email: email }).then(user => {
+           
+            if (state) {
+                user.state = state
+            }
+            user.save();
+        })
+    }
+})
 
 
 module.exports = router

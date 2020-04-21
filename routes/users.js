@@ -6,6 +6,13 @@ const router = express.Router()
 const async = require('async')
 const nodemailer = require('nodemailer')
 const crypto = require('crypto')
+const stripe = require('stripe')('sk_test_Os08IxuPe89dKTQLB4Q4QhEw00Zwzbhykz');
+
+/*stripe.customers.create({
+  email: 'barbatos252@gmail.com',
+})
+  .then(customer => console.log(customer.id))
+  .catch(error => console.error(error));*/
 
 //Login Page
 router.get('/login', (req, res) => res.send('Login'))
@@ -211,6 +218,7 @@ router.post('/reset/:token', function (req, res) {
 router.post('/register', (req, res) => {
 
   const { firstName, lastName, email, password, passwordCheck } = req.body
+  state = "active";
   //console.log(passwordCheck)
   let errors = []
   //Cheeck require fields
@@ -242,7 +250,7 @@ router.post('/register', (req, res) => {
         errors.forEach(element => { console.log(element.message) })
         res.send("something went wrong")
       } else {
-        const newUser = new User({ firstName, lastName, email, password })
+        const newUser = new User({ firstName, lastName, email, password, state })
         //console.log(newUser)
         bcrypt.genSalt(10, (err, salt) => bcrypt.hash(newUser.password, salt, (err, hash) => {
           if (err) throw err
@@ -339,5 +347,64 @@ router.put('/updateProfile', (req, res) => {
 })
 
 
+//new subscription Handle
+router.put('/newSubscription', (req, res) => {
+  newSubscription()
+  const { firstName, lastName, email, password, passwordCheck ,ville,address,zipCode,phone} = req.body
+  const data = { firstName : req.body.firstName, 
+                 lastName : req.body.lastName, 
+                 email : req.body.email ,
+                 ville : req.body.ville ,
+                 address : req.body.address ,
+                 zipCode : req.body.zipCode ,
+                 phone : req.body.phone,
+                 subscription : "subscribed",
+                 subscriptionStartDate : Date.now()} 
+
+  let errors = []
+  if (errors.length > 0) {
+    //render register page again and refill the form
+    errors.forEach(element => { console.log(element.message) })
+
+  } else {
+    //Validation pass
+    User.findOneAndUpdate({ email: email }, data, {upsert: true}, function(err, doc) {
+      if (err) return res.status(500).json({error: err});
+      return res.send('Succesfully saved.');
+  });
+  }
+})
+
+function newSubscription()
+{
+  (async () => {
+    stripe.customers.list(
+      {limit: 1,
+      email : "barbatos252@gmail.com"},
+      function(err, customers) {
+        customers.data.forEach(element => {
+
+          stripe.plans.list(
+            {limit: 1},
+            function(err, plans) {
+              plans.data.forEach(plan => {
+                (async () => {
+                  const subscription = await stripe.subscriptions.create({
+                    customer: element.id,
+                    collection_method : "charge_automatically",
+                    items: [
+                      {
+                        plan: plan.id,
+                        quantity: 1,
+                      },
+                    ],
+                  });})();
+              });
+        });
+        });
+      }
+    );
+  })();
+}
 
 module.exports = router
