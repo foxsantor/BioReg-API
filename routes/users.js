@@ -349,7 +349,7 @@ router.put('/updateProfile', (req, res) => {
 
 //new subscription Handle
 router.put('/newSubscription', (req, res) => {
-  newSubscription()
+  //newSubscription()
   const { firstName, lastName, email, password, passwordCheck ,ville,address,zipCode,phone} = req.body
   const data = { firstName : req.body.firstName, 
                  lastName : req.body.lastName, 
@@ -361,6 +361,7 @@ router.put('/newSubscription', (req, res) => {
                  subscription : "subscribed",
                  subscriptionStartDate : Date.now()} 
 
+  newSubscription(req.body.email)
   let errors = []
   if (errors.length > 0) {
     //render register page again and refill the form
@@ -375,12 +376,13 @@ router.put('/newSubscription', (req, res) => {
   }
 })
 
-function newSubscription()
+function newSubscription(mail)
 {
+  creatCustomer(mail);
   (async () => {
     stripe.customers.list(
       {limit: 1,
-      email : "barbatos252@gmail.com"},
+      email : mail},
       function(err, customers) {
         customers.data.forEach(element => {
 
@@ -391,7 +393,8 @@ function newSubscription()
                 (async () => {
                   const subscription = await stripe.subscriptions.create({
                     customer: element.id,
-                    collection_method : "charge_automatically",
+                    //collection_method : "charge_automatically",
+                    cancel_at_period_end : true,
                     items: [
                       {
                         plan: plan.id,
@@ -407,4 +410,116 @@ function newSubscription()
   })();
 }
 
+
+router.get('/subscriptionList', isValidUser,function (req, res) {
+  (async () => {
+    stripe.customers.list(
+      {limit: 1,
+      email : req.user.email},
+      function(err, customers) {
+        customers.data.forEach(element => {
+          res.json(element.subscriptions.data);
+          
+          /*stripe.plans.list(
+            {limit: 0},
+            function(err, plans) {
+              plans.data.forEach(plan => {
+                res.json(plan);
+              });
+        });*/
+        });
+      }
+    );
+  })();
+});
+
+function subscriptionCheck() {
+  (async () => {
+    stripe.customers.list(
+      {limit: 1,
+      },
+      function(err, customers) {
+        customers.data.forEach(customer => {
+
+          //console.log(customer.subscriptions.data);
+          
+          customer.subscriptions.data.forEach(element => {
+
+            var diff = Math.abs(
+              new Date(element.current_period_start).getTime() - 
+              new Date(element.current_period_end).getTime()
+                                 );
+              var diffDays = Math.ceil(diff / (1000 * 3600 * 24)); 
+              if(diffDays < 7 )
+              sendAlertMails(customer.email,diffDays);
+          });
+            
+          /*stripe.plans.list(
+            {limit: 0},
+            function(err, plans) {
+              plans.data.forEach(plan => {
+                res.json(plan);
+              });
+        });*/
+
+        });
+      }
+    );
+  })();
+}
+function sendAlertMails(mail,days){
+  var transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+      user: 'qtcreator6@gmail.com',
+      pass: '123456789az'
+    }
+  });
+  
+  var mailOptions = {
+    from: 'bioreginc@gmail.com',
+    to: mail,
+    subject: 'Subscription Renewal',
+    text: 'your subscription to our service will end in '+days+' days please remember to renew it'
+  };
+  
+  transporter.sendMail(mailOptions, function(error, info){
+    if (error) {
+      console.log(error);
+    } else {
+      console.log('Email sent: ' + info.response);
+    }
+  });
+  }
+
+function creatCustomer(mail)
+{
+  (async () => {
+    stripe.customers.list(
+      {limit: 1,
+        email:mail
+      },
+      function(err, customers) {
+        if(customers.data.length == 0)
+        {
+          stripe.customers.create(
+            {
+              email: mail,
+            },
+            function(err, customer) {
+              console.log("customer add")
+            }
+          );
+        }
+        else
+        {
+          console.log("customer already exist")
+        }
+      }
+    );
+  })();
+ 
+}
+  
+setInterval(subscriptionCheck, 86400000);
 module.exports = router
