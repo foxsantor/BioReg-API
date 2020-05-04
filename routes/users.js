@@ -1,5 +1,7 @@
 const express = require('express')
 const User = require('../Models/User')
+const Refund = require('../Models/Refund')
+const Questions = require('../Models/Questions')
 const bcrypt = require('bcryptjs')
 const passport = require('passport')
 const router = express.Router()
@@ -361,7 +363,9 @@ router.put('/newSubscription', (req, res) => {
                  subscription : "subscribed",
                  subscriptionStartDate : Date.now()} 
 
-  newSubscription(req.body.email)
+  creatCustomer(req.body.email,req.body.cardToken);
+  newSubscription(req.body.email,req.body.cardToken)
+  
   let errors = []
   if (errors.length > 0) {
     //render register page again and refill the form
@@ -376,9 +380,9 @@ router.put('/newSubscription', (req, res) => {
   }
 })
 
-function newSubscription(mail)
+function newSubscription(mail,cardToken)
 {
-  creatCustomer(mail);
+  
   (async () => {
     stripe.customers.list(
       {limit: 1,
@@ -394,14 +398,19 @@ function newSubscription(mail)
                   const subscription = await stripe.subscriptions.create({
                     customer: element.id,
                     //collection_method : "charge_automatically",
-                    cancel_at_period_end : true,
+                    cancel_at_period_end : false, //false for auto charge at periode end
+                    trial_period_days: 3,//number of day in the trial
                     items: [
                       {
                         plan: plan.id,
                         quantity: 1,
                       },
                     ],
-                  });})();
+                  },function(err,result)
+                  {
+                    console.log(err)
+                  }
+                  );})();
               });
         });
         });
@@ -410,6 +419,44 @@ function newSubscription(mail)
   })();
 }
 
+router.put('/cancelSubscription', (req, res) => {
+  const { id } = req.body
+  let errors = []
+  if (errors.length > 0) {
+    //render register page again and refill the form
+    errors.forEach(element => { console.log(element.message) })
+
+  } else {
+    stripe.subscriptions.del(
+      id,
+      function(err, confirmation) {
+        console.log(confirmation)
+      }
+    );
+  }
+})
+
+router.put('/cancelTrial', (req, res) => {
+  const { id } = req.body
+  let errors = []
+  if (errors.length > 0) {
+    //render register page again and refill the form
+    errors.forEach(element => { console.log(element.message) })
+
+  } else {
+    stripe.subscriptions.update(id, {
+      trial_end: 'now',
+    });
+
+    stripe.subscriptions.del(
+      id,
+      function(err, confirmation) {
+        res.json(confirmation)
+      }
+    );
+
+  }
+})
 
 router.get('/subscriptionList', isValidUser,function (req, res) {
   (async () => {
@@ -418,19 +465,86 @@ router.get('/subscriptionList', isValidUser,function (req, res) {
       email : req.user.email},
       function(err, customers) {
         customers.data.forEach(element => {
-          res.json(element.subscriptions.data);
           
-          /*stripe.plans.list(
-            {limit: 0},
-            function(err, plans) {
-              plans.data.forEach(plan => {
-                res.json(plan);
-              });
-        });*/
+          stripe.subscriptions.list(
+            {limit: 100,customer:element.id,status:"all"},
+            function(err, subscriptions) {
+              res.json(subscriptions.data);
+            }
+          );
+
         });
       }
     );
   })();
+});
+
+
+router.post('/refundRequest',function (req, res) {
+  const { subscriptionId } = req.body
+
+    stripe.subscriptions.retrieve(
+      subscriptionId,
+      function(err, subscription) {
+        
+        stripe.customers.retrieve(
+          subscription.customer,
+          function(err, customer) {
+            subscription.items.data.forEach(element => {
+              console.log(element.plan.nickname)
+              Refund.findOne({ email: customer.email,subscriptionId:subscriptionId }).then(refund => {
+                if (refund) {
+                  //User exist render the veiw again with refilling the fileds 
+                 // errors.push({ message: "refund already pending" })
+                  errors.forEach(element => { console.log(element.message) })
+                  res.send("something went wrong")
+                } else {
+                  var diff = Math.abs(
+                    new Date(subscription.current_period_start).getTime() - 
+                    new Date(subscription.current_period_end).getTime()
+                                       );
+                    var daysLeft = Math.ceil(diff / (1000 * 3600 * 24)); 
+                    console.log(daysLeft)
+               
+                  email = customer.email;
+                  planNickname = element.plan.nickname
+                  const newrefund = new Refund({ email, subscriptionId ,daysLeft, planNickname})
+                  
+                  newrefund.save()
+                }
+          
+              })
+
+
+            });
+           
+          }
+        );
+
+      }
+    );
+  
+
+});
+
+
+router.post('/askQuestons',function (req, res) {
+  const { question,email} = req.body
+  const newQuestion = new Questions({ email, question})
+  newQuestion.save()
+});
+
+router.post('/listquestions', function (req, res) {
+  const { email} = req.body
+  Questions.find({email:email},function(err, questions){
+    if(err)
+    {
+      res.send('somthing went wrong');
+      next();
+    }
+    res.json(questions);
+  })
+  //return res.status(200).json();
 });
 
 function subscriptionCheck() {
@@ -453,20 +567,67 @@ function subscriptionCheck() {
               if(diffDays < 7 )
               sendAlertMails(customer.email,diffDays);
           });
-            
-          /*stripe.plans.list(
-            {limit: 0},
-            function(err, plans) {
-              plans.data.forEach(plan => {
-                res.json(plan);
-              });
-        });*/
 
         });
       }
     );
   })();
 }
+
+function trialsCheck()
+{
+  (async () => {
+    stripe.subscriptions.list(
+        {limit: 100,status:"trialing"},
+        function(err, subscriptions) {
+            subscriptions.data.forEach(element => {
+              var diff = Math.abs(
+                new Date(element.trial_start).getTime() - 
+                new Date(element.trial_end).getTime()
+                                   );
+                var diffDays = Math.ceil(diff / (1000 * 3600 * 24)); 
+                if(diffDays <= 3 )
+                {
+                  stripe.customers.retrieve(
+                    element.customer,
+                    function(err, customer) {
+                      sendAlertTrialMails(customer.email,diffDays);
+                    }
+                  );
+                
+              }
+
+            });
+        }
+      );
+})();
+}
+
+function sendAlertTrialMails(mail,days){
+  var transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+      user: 'qtcreator6@gmail.com',
+      pass: '123456789az'
+    }
+  });
+  
+  var mailOptions = {
+    from: 'bioreginc@gmail.com',
+    to: mail,
+    subject: 'Trial periode',
+    text: 'your trial periode to our services ends in '+days+' your paied subsciption will start after the prementioned days unless canceled'
+  };
+  
+  transporter.sendMail(mailOptions, function(error, info){
+    if (error) {
+      console.log(error);
+    } else {
+      console.log('Email sent: ' + info.response);
+    }
+  });
+  }
+
 function sendAlertMails(mail,days){
   var transporter = nodemailer.createTransport({
     service: 'gmail',
@@ -480,7 +641,7 @@ function sendAlertMails(mail,days){
     from: 'bioreginc@gmail.com',
     to: mail,
     subject: 'Subscription Renewal',
-    text: 'your subscription to our service will end in '+days+' days please remember to renew it'
+    text: 'your subscription to our service will end in '+days+' it will be renewed automaticly unless canceled'
   };
   
   transporter.sendMail(mailOptions, function(error, info){
@@ -492,7 +653,7 @@ function sendAlertMails(mail,days){
   });
   }
 
-function creatCustomer(mail)
+function creatCustomer(mail,cardToken)
 {
   (async () => {
     stripe.customers.list(
@@ -502,12 +663,26 @@ function creatCustomer(mail)
       function(err, customers) {
         if(customers.data.length == 0)
         {
+
           stripe.customers.create(
             {
               email: mail,
             },
             function(err, customer) {
-              console.log("customer add")
+              stripe.tokens.retrieve(
+                cardToken.id,
+                function(err, token) {
+                  //console.log(token.card)
+                  
+                  stripe.customers.createSource(
+                    customer.id,
+                    {source: token.id},
+                    function(err, card) {
+                     console.log(card)
+                    }
+                  );
+                }
+              );
             }
           );
         }
@@ -521,5 +696,73 @@ function creatCustomer(mail)
  
 }
   
+function test(){
+  /*stripe.tokens.retrieve(
+    'tok_1Ge9MAAp8FZAkd8h0LSbCYKX',
+    function(err, token) {
+      //console.log(token.card)
+      
+      stripe.customers.createSource(
+        'cus_HCYRFWtb2oZTOW',
+        {source: token.id},
+        function(err, card) {
+         console.log(card)
+        }
+      );
+    }
+  );*/
+
+  stripe.plans.list(
+    {limit: 1},
+    function(err, plans) {
+      plans.data.forEach(plan => {
+        (async () => {
+          const subscription = await stripe.subscriptions.create({
+            customer: "cus_HCYRFWtb2oZTOW",
+            //collection_method : "charge_automatically",
+            cancel_at_period_end : true,
+            items: [
+              {
+                plan: plan.id,
+                quantity: 1,
+              },
+            ],
+          },function (err,subscription)
+          {
+            subscription.items.data.forEach(element => {
+              //console.log(element.plan.id)
+              /*stripe.checkout.sessions.create(
+                {
+                  success_url: 'https://example.com/success',
+                  cancel_url: 'https://example.com/cancel',
+                  payment_method_types: ['card'],
+                  customer : 'cus_HCYRFWtb2oZTOW',
+                  subscription_data : {
+                    items: [{
+                      plan: element.plan.id,
+                    }],
+                  },
+                },
+                function(err, session) {
+                  console.log(session)
+                }
+              );*/
+            });
+            
+          }
+          
+          );})();
+
+         
+
+
+      });
+});
+  
+}
+
+//test();
+
+setInterval(trialsCheck, 86400000);
 setInterval(subscriptionCheck, 86400000);
 module.exports = router

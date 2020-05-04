@@ -1,6 +1,8 @@
 const express = require('express')
 const Admin = require('../Models/Admin')
 const User = require('../Models/User')
+const Refund = require('../Models/Refund')
+const Questions = require('../Models/Questions')
 const bcrypt = require('bcryptjs')
 const passport = require('passport')
 const router = express.Router()
@@ -8,6 +10,7 @@ const async = require('async')
 const nodemailer = require('nodemailer')
 const crypto = require('crypto')
 const LocalStrategy = require('passport-local').Strategy;
+const stripe = require('stripe')('sk_test_Os08IxuPe89dKTQLB4Q4QhEw00Zwzbhykz');
 
 //Login Page
 router.get('/login', (req, res) => res.send('Login'))
@@ -370,4 +373,173 @@ router.put('/updateState', (req, res) => {
 })
 
 
+router.post('/answerQuestons',function (req, res) {
+    const { answer,email} = req.body
+
+    const data = { answer : answer, 
+                   dateAnswer : Date.now(),
+                   state: true} 
+
+    Questions.findOneAndUpdate({ email: email }, data, {upsert: true}, function(err, doc) {
+        if (err) return res.status(500).json({error: err});
+        return res.send('Succesfully saved.');
+    });
+  });
+  
+  router.get('/listQuestions', function (req, res) {
+    Questions.find({state:false},function(err, questions){
+      if(err)
+      {
+        res.send('somthing went wrong');
+        next();
+      }
+      res.json(questions);
+    })
+    //return res.status(200).json();
+  });
+
+  router.post('/listClientQuestions', function (req, res) {
+      const {email,_id}=req.body
+      console.log(_id)
+    Questions.find({email:email,_id:_id},function(err, questions){
+      if(err)
+      {
+        res.send('somthing went wrong');
+      }
+      console.log(questions)
+      res.json(questions);
+    })
+    //return res.status(200).json();
+  });
+
+
+
+router.get('/subscriptionList',function (req, res) {
+    (async () => {
+        stripe.subscriptions.list(
+            {limit: 100,status:"all"},
+            function(err, subscriptions) {
+                console.log(subscriptions.data)
+              res.json(subscriptions.data);
+            }
+          );
+    })();
+  });
+
+  router.get('/subscriptionActiveList',function (req, res) {
+    (async () => {
+        stripe.subscriptions.list(
+            {limit: 100},
+            function(err, subscriptions) {
+                console.log(subscriptions.data)
+              res.json(subscriptions.data);
+            }
+          );
+    })();
+  });
+
+  router.get('/subscriptionCanceledList',function (req, res) {
+    (async () => {
+        stripe.subscriptions.list(
+            {limit: 100,status:"canceled"},
+            function(err, subscriptions) {
+                console.log(subscriptions.data)
+              res.json(subscriptions.data);
+            }
+          );
+    })();
+  });
+
+  router.get('/transactionList',function (req, res) {
+    (async () => {
+        stripe.balanceTransactions.list(
+            {limit: 100},
+            function(err, balanceTransactions) {
+                res.json(balanceTransactions.data)
+            }
+          );
+    })();
+  });
+
+router.get('/refundRequestList',function (req, res) {
+    
+        Refund.find({}, function (err, refunds) {
+            if (err) {
+                res.send('somthing went wrong');
+                next();
+            }
+            res.json(refunds);
+        })
+        //return res.status(200).json();
+});
+
+router.get('/refundRequestRefused',function (req, res) {
+  
+});
+
+router.post('/refundRequestAccepted', (req, res) => {
+    
+    const { subscriptionId,daysLeft } = req.body
+
+    stripe.subscriptions.retrieve(
+        subscriptionId,
+        function (err, subscription) {
+            stripe.customers.retrieve(
+                subscription.customer,
+                function(err, customer) {
+                    subscription.items.data.forEach(element => {
+                        if(element.plan.interval=="day")
+                        {
+                           /*const amountPerday = element.plan.amount/30;
+                           const amountToRefund = amountPerday*daysLeft;*/
+                           
+                          /* minimumAmount = 50;
+                           amountToRefund = minimumAmount+2000;
+                           stripe.charges.create(
+                            {
+                              amount: minimumAmount,
+                              currency: 'usd',
+                              customer : customer.id,
+                              description: 'refund',
+                            },
+                            function(err, charge) {
+                                console.log(charge)
+                                stripe.refunds.create(
+                                    {
+                                        charge: charge.id,
+                                        amount : amountToRefund,
+                                    },
+                                    function(err, refund) {
+                                      console.log(refund)
+                                    }
+                                  );
+                            }
+                          );*/
+        
+                        }
+                    });
+                }
+              );
+           
+        }
+    );
+
+})
+
+
+  function test()
+  {
+    (async () => {
+        stripe.subscriptions.list(
+            {limit: 100},
+            function(err, subscriptions) {
+                subscriptions.data.forEach(element => {
+                    console.log(element.trial_end);
+                });
+              
+            }
+          );
+    })();
+  }
+//test()
 module.exports = router
