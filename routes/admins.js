@@ -59,17 +59,51 @@ router.get('/logout', isValidAdmin, (req, res) => {
   }
 ));
 
+passport.serializeUser(Admin.serializeUser());
+passport.deserializeUser(Admin.deserializeUser());
+
 //Login Handle
 router.post('/login', function (req, res, next) {
+    
     passport.authenticate('admin', function (err, admin, info) {
         if (err) { return res.status(501).json(err); }
         if (!admin) { return res.status(501).json(info); }
         req.logIn(admin, function (err) {
             if (err) { return res.status(501).json(err); }
-            return res.status(200).json({ message: 'Login Success' });
+            
+            return res.status(200).json({ message: 'Login Success',id:admin._id });
         });
     })(req, res, next);
 });
+
+
+//profile handle 
+router.post('/adminProfile', function (req, res, next) {
+    const { _id } = req.body;
+
+    Admin.find({_id:_id}, function (err, admins) {
+        if (err) {
+            res.send('somthing went wrong');
+            next();
+        }
+        res.send(admins);
+    })
+
+    //return res.status(200).json(req.admin);
+});
+
+/*passport.serializeUser(function (user, done) {
+    done(null, users[0].id);
+});
+passport.deserializeUser(function (id, done) {
+    done(null, users[0]);
+});*/
+
+//logged user verification
+function isValidAdmin(req, res, next) {
+    if (req.isAuthenticated()) next();
+    else return res.status(401).json({ message: 'Unauthorized Request' });
+}
 
 //users list
 router.get('/listUsers', function (req, res) {
@@ -95,23 +129,6 @@ router.get('/listAdmins', function (req, res) {
     //return res.status(200).json();
 });
 
-//profile handle 
-router.get('/adminProfile', isValidAdmin, function (req, res, next) {
-    return res.status(200).json(req.admin);
-});
-
-passport.serializeUser(function (user, done) {
-    done(null, users[0].id);
-});
-passport.deserializeUser(function (id, done) {
-    done(null, users[0]);
-});
-
-//logged user verification
-function isValidAdmin(req, res, next) {
-    if (req.isAuthenticated()) next();
-    else return res.status(401).json({ message: 'Unauthorized Request' });
-}
 
 //reset password Handle
 router.post('/forgotPassword', function (req, res, next) {
@@ -306,13 +323,23 @@ router.post('/register', (req, res) => {
 //update profile
 router.put('/updateProfile', (req, res) => {
 
-    const { firstName, lastName, email, password, passwordCheck, phoneNumber } = req.body
+    const { firstName, 
+            lastName, 
+            email, 
+            password, 
+            passwordCheck, 
+            phoneNumber,
+            position,
+            qualification,
+            gender, } = req.body
+
     let errors = []
     if (errors.length > 0) {
         //render register page again and refill the form
         errors.forEach(element => { console.log(element.message) })
 
     } else {
+
         //Validation pass
         Admin.findOne({ email: email }).then(admin => {
             //console.log(user)
@@ -324,6 +351,15 @@ router.put('/updateProfile', (req, res) => {
             }
             if (phoneNumber) {
                 admin.phoneNumber = phoneNumber
+            }
+            if (position) {
+                admin.position = position
+            }
+            if (qualification) {
+                admin.qualification = qualification
+            }
+            if (gender) {
+                admin.gender = gender
             }
             if (password) {
                 if (password !== passwordCheck) {
@@ -380,7 +416,7 @@ router.post('/answerQuestons',function (req, res) {
                    dateAnswer : Date.now(),
                    state: true} 
 
-    Questions.findOneAndUpdate({ email: email }, data, {upsert: true}, function(err, doc) {
+    Questions.findOneAndUpdate({ email: email,state:false }, data, {upsert: true}, function(err, doc) {
         if (err) return res.status(500).json({error: err});
         return res.send('Succesfully saved.');
     });
@@ -400,13 +436,13 @@ router.post('/answerQuestons',function (req, res) {
 
   router.post('/listClientQuestions', function (req, res) {
       const {email,_id}=req.body
-      console.log(_id)
+      //console.log(_id)
     Questions.find({email:email,_id:_id},function(err, questions){
       if(err)
       {
         res.send('somthing went wrong');
       }
-      console.log(questions)
+     // console.log(questions)
       res.json(questions);
     })
     //return res.status(200).json();
@@ -419,7 +455,7 @@ router.get('/subscriptionList',function (req, res) {
         stripe.subscriptions.list(
             {limit: 100,status:"all"},
             function(err, subscriptions) {
-                console.log(subscriptions.data)
+                //console.log(subscriptions.data)
               res.json(subscriptions.data);
             }
           );
