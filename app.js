@@ -27,7 +27,7 @@ require('./config/passport')(passport)
 const mongoose = require('mongoose')
 
 app.use(cors({
-  origin:['http://localhost:4200','http://127.0.0.1:4200','http://192.168.1.3:5000'],
+  origin:['http://localhost:4200','http://127.0.0.1:4200','http://192.168.1.100:5000'],
   credentials:true
 })) 
 
