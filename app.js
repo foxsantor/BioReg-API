@@ -5,8 +5,20 @@ const passport = require('passport')
 var cors= require('cors');
 
 
-// Test mejda 
-// Test 2 mejda 
+
+
+//mejda
+bodyParser = require('body-parser')
+
+
+//mejda
+// Routes to Handle Request
+const productRoute = require('./routes/product.route')
+const blogs = require('./routes/blogs')
+
+
+
+
 
 
 const app = express()
@@ -66,5 +78,47 @@ app.use('/admins',require('./routes/admins'))
 
 
 
+
+app.use('/blogs', require('./routes/blogs') );
+
+
+
+//mejda
+// Make "public" Folder Publicly Available
+app.use('/public', express.static('public'));
+
+//mejda
+// API Route
+app.use('/api', productRoute)
+
+//mejda
+// Error favicon.ico
+app.get('/favicon.ico', (req, res) => res.status(204));
+
+
+
+
+
+
+
 const PORT = process.env.PORT || 5000
 app.listen(PORT,console.log('Server started on PORT: '+ PORT))
+
+
+
+
+
+//mejda
+// Error
+app.use((req, res, next) => {
+  // Error goes via `next()` method
+  setImmediate(() => {
+    next(new Error('Something went wrong'));
+  });
+});
+
+app.use(function (err, req, res, next) {
+  console.error(err.message);
+  if (!err.statusCode) err.statusCode = 500;
+  res.status(err.statusCode).send(err.message);
+});
