@@ -75,7 +75,7 @@ app.use((req,res,next)=>{
 app.use('/',require('./routes/index'))
 app.use('/users',require('./routes/users'))
 app.use('/admins',require('./routes/admins'))
-
+app.use('/apis',require('./routes/usersApp'))
 
 
 
