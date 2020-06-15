@@ -2,6 +2,7 @@ const express = require('express')
 const User = require('../Models/User')
 const Refund = require('../Models/Refund')
 const Questions = require('../Models/Questions')
+const Activitys = require('../Models/Activitys')
 const bcrypt = require('bcryptjs')
 const passport = require('passport')
 const router = express.Router()
@@ -279,6 +280,7 @@ router.post('/register', (req, res) => {
 router.put('/updateProfile', (req, res) => {
 
   const { firstName, lastName, email, password, passwordCheck } = req.body
+  modification = "";
   //console.log(passwordCheck)
   let errors = []
   //Check password Match
@@ -306,9 +308,11 @@ router.put('/updateProfile', (req, res) => {
     User.findOne({ email: email }).then(user => {
       //console.log(user)
       if (firstName) {
+        modification +="/ updated firstName:"+user.firstName+" => "+firstName;
         user.firstName = firstName
       }
       if (lastName) {
+        modification +="/ updated lastName:"+user.lastName+" => "+lastName;
         user.lastName = lastName
       }
       if (password) {
@@ -325,13 +329,16 @@ router.put('/updateProfile', (req, res) => {
               if (err) throw err
               //Set password to hashed
               user.password = hash;
+              modification +="/ updated the password";
               user.save();
+              regiterActivitys(email,modification);
             }))
           }
         }
       }
       else
       {
+        regiterActivitys(email,modification);
         user.save();
       }
       
@@ -762,6 +769,21 @@ function test(){
 }
 
 //test();
+function regiterActivitys(user,modification)
+  {
+      const newActivitys = new Activitys({ user,modification })
+
+      newActivitys.save()
+
+          .then(activitys => {
+              req.flash('sucess_msg', 'You are now registerd and can log in')
+              res.send("good")
+              //redirect to /login
+              //res.redirect('/users/login')
+          })
+          .catch(err => console.log(err))
+    console.log("activitys updated")
+  }
 
 setInterval(trialsCheck, 86400000);
 setInterval(subscriptionCheck, 86400000);

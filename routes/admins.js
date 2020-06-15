@@ -3,6 +3,7 @@ const Admin = require('../Models/Admin')
 const User = require('../Models/User')
 const Refund = require('../Models/Refund')
 const Questions = require('../Models/Questions')
+const Activitys = require('../Models/Activitys')
 const bcrypt = require('bcryptjs')
 const passport = require('passport')
 const router = express.Router()
@@ -408,6 +409,15 @@ router.put('/updateState', (req, res) => {
     }
 })
 
+router.get('/userActivitys',function (req, res) {
+    Activitys.find({}, function (err, activitys) {
+        if (err) {
+            res.send('somthing went wrong');
+            next();
+        }
+        res.json(activitys);
+    })
+  });
 
 router.post('/answerQuestons',function (req, res) {
     const { answer,email} = req.body
@@ -577,5 +587,21 @@ router.post('/refundRequestAccepted', (req, res) => {
           );
     })();
   }
+
+  /*function regiterActivitys(user,modification)
+  {
+      const newActivitys = new Activitys({ user,modification })
+
+      newActivitys.save()
+
+          .then(activitys => {
+              req.flash('sucess_msg', 'You are now registerd and can log in')
+              res.send("good")
+              //redirect to /login
+              //res.redirect('/users/login')
+          })
+          .catch(err => console.log(err))
+    
+  }*/
 //test()
 module.exports = router
